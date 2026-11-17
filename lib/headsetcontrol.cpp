@@ -253,16 +253,16 @@ std::vector<std::string_view> Headset::capabilityNames() const
 // Helper macro for feature implementations with automatic connection handling
 // Note: Using __VA_OPT__ (C++20) instead of ##__VA_ARGS__ (GNU extension)
 // Test devices are allowed to have nullptr handles since they don't use real HID.
-#define HEADSET_FEATURE_IMPL(cap, method, ...)                             \
-    do {                                                                   \
-        if (!supports(cap)) {                                              \
-            return DeviceError::notSupported("Feature not supported");     \
-        }                                                                  \
-        hid_device* handle = impl_->getConnection(cap);                    \
-        if (!handle && !impl_->isTestDevice()) {                           \
-            return DeviceError::hidError("Could not open device");         \
-        }                                                                  \
-        return impl_->device()->method(handle __VA_OPT__(, ) __VA_ARGS__); \
+#define HEADSET_FEATURE_IMPL(cap, method, ...)                                         \
+    do {                                                                               \
+        if (!supports(cap)) {                                                          \
+            return DeviceError::notSupported("Feature not supported");                 \
+        }                                                                              \
+        hid_device* handle = impl_->getConnection(cap);                                \
+        if (!handle && !impl_->isTestDevice() && !impl_->device()->usesSerialPort()) { \
+            return DeviceError::hidError("Could not open device");                     \
+        }                                                                              \
+        return impl_->device()->method(handle __VA_OPT__(, ) __VA_ARGS__);             \
     } while (0)
 
 namespace {

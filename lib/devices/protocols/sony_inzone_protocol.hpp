@@ -72,6 +72,7 @@ protected:
     static constexpr uint8_t EID_NC_TOGGLE_SETTING      = 0x42;
     static constexpr uint8_t EID_NC_STARTUP_MODE        = 0x43;
     static constexpr uint8_t EID_AUTO_POWER_OFF_SETTING = 0x81;
+    static constexpr uint8_t EID_LED_SETTING            = 0x82;
     static constexpr uint8_t EID_BT_STARTUP_MODE        = 0x63;
     static constexpr uint8_t EID_GUIDANCE_SETTING       = 0x84;
     static constexpr uint8_t EID_MIC_ATTACHED_STATUS    = 0x8F;
@@ -233,6 +234,18 @@ protected:
         return VoicePromptsResult { .enabled = enabled };
     }
 
+    Result<LightsResult> setSonyLights(hid_device* device_handle, bool on)
+    {
+        const std::array<uint8_t, 1> payload { static_cast<uint8_t>(on ? 1 : 0) };
+        auto resp = exchange(device_handle, ADDR_PC_TO_RX, EID_LED_SETTING, ETYPE_SET,
+            std::span<const uint8_t> { payload });
+        if (!resp) {
+            return resp.error();
+        }
+
+        return LightsResult { .enabled = on };
+    }
+
     Result<MicAttachmentStatusResult> getSonyMicAttachmentStatus(hid_device* device_handle)
     {
         auto resp = exchange(device_handle, ADDR_PC_TO_RX, EID_MIC_ATTACHED_STATUS, ETYPE_GET, {});
@@ -355,6 +368,18 @@ protected:
         return BluetoothWhenPoweredOnResult { .enabled = enabled };
     }
 
+    uint16_t nextTransactionId()
+    {
+        uint16_t tid = ++transaction_counter_;
+        if (tid <= 1) {
+            // Skip TID 0 (overflow) and TID 1: the dongle's own unsolicited
+            // NTFY_ACTIVE pushes carry TID=1, so reusing it would let a push be
+            // matched as our reply.
+            tid = transaction_counter_ = 2;
+        }
+        return tid;
+    }
+
     /**
      * @brief Send an HCI COMMAND and wait for the matching EVENT response.
      *
@@ -363,7 +388,7 @@ protected:
      * NTFY_ACTIVE events may arrive on the same channel; we skip frames that
      * don't match our request.
      */
-    Result<ParsedEvent> exchange(hid_device* device_handle, uint8_t address,
+    virtual Result<ParsedEvent> exchange(hid_device* device_handle, uint8_t address,
         uint8_t event_id, uint8_t event_type, std::span<const uint8_t> payload)
     {
         if (payload.size() > MAX_PAYLOAD_SIZE) {
@@ -371,13 +396,7 @@ protected:
                 std::format("Payload of {} bytes exceeds maximum of {}", payload.size(), MAX_PAYLOAD_SIZE));
         }
 
-        uint16_t tid = ++transaction_counter_;
-        if (tid <= 1) {
-            // Skip TID 0 (overflow) and TID 1: the dongle's own unsolicited
-            // NTFY_ACTIVE pushes carry TID=1, so reusing it would let a push be
-            // matched as our reply.
-            tid = transaction_counter_ = 2;
-        }
+        const uint16_t tid = nextTransactionId();
 
         std::array<uint8_t, REPORT_SIZE> buf {};
         buildCommand(buf, address, event_id, event_type, tid, payload);
@@ -526,6 +545,36 @@ protected:
                        ? std::vector<uint8_t>(buf.begin() + 13, buf.begin() + hid_length + 1)
                        : std::vector<uint8_t> {},
         };
+    }
+
+    /**
+     * @brief Build a raw Sony vendor HCI COMMAND packet (without HID report framing).
+     */
+    static std::vector<uint8_t> buildHciCommand(uint8_t address, uint8_t event_id,
+        uint8_t event_type, uint16_t tid, std::span<const uint8_t> payload)
+    {
+        const size_t payload_len = std::min(payload.size(), MAX_PAYLOAD_SIZE);
+        std::array<uint8_t, REPORT_SIZE> buf {};
+        buildCommand(buf, address, event_id, event_type, tid, payload);
+        return std::vector<uint8_t>(buf.begin() + 2, buf.begin() + 14 + payload_len);
+    }
+
+    /**
+     * @brief Validate and parse a raw incoming HCI EVENT frame (without HID report framing).
+     */
+    static std::optional<ParsedEvent> parseHciEvent(std::span<const uint8_t> hci)
+    {
+        if (hci.size() < 12 || hci.size() > REPORT_SIZE - 2) {
+            return std::nullopt;
+        }
+        if (static_cast<size_t>(3 + hci[2]) != hci.size()) {
+            return std::nullopt;
+        }
+        std::array<uint8_t, REPORT_SIZE> buf {};
+        buf[0] = REPORT_ID;
+        buf[1] = static_cast<uint8_t>(hci.size());
+        std::copy(hci.begin(), hci.end(), buf.begin() + 2);
+        return parseEvent(buf);
     }
 
 private:

@@ -61,8 +61,8 @@ public:
 /**
  * @brief Production serial interface
  *
- * Finds the port with get_serial_path(). Only implemented for Linux, open()
- * fails with notSupported elsewhere.
+ * Finds the port with get_serial_path(). Implemented for Linux and Windows;
+ * open() fails with notSupported elsewhere.
  */
 class RealSerialInterface final : public SerialInterface {
 public:

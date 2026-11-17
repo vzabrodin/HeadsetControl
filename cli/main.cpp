@@ -726,10 +726,12 @@ FeatureResult handleFeature(DiscoveredDevice& dev, capabilities cap, capabilityt
     // Connect to device (unless test device)
     if (!is_test) {
         handle = connectForCapability(dev.connection, dev.device, dev.product_id, cap);
-        if (!handle) {
+        if (!handle && !dev.device->usesSerialPort()) {
             return make_error(-1, "Could not open device");
         }
-        refineProductName(dev, handle);
+        if (handle) {
+            refineProductName(dev, handle);
+        }
     }
 
     // Execute via handler registry (no more giant switch!)
@@ -1364,7 +1366,7 @@ bool checkDeviceConnected(DiscoveredDevice& selected, const Options& opts)
         return true;
 
     hid_device* h = connectForCapability(selected.connection, selected.device, selected.product_id, CAP_BATTERY_STATUS);
-    if (!h)
+    if (!h && !selected.device->usesSerialPort())
         return false;
 
     // A charging headset is plainly there; the other statuses all mean it could

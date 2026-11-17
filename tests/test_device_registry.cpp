@@ -278,6 +278,33 @@ void testLookupJabraLink390()
     std::cout << "    PASS" << std::endl;
 }
 
+void testLookupSonyINZONEH9()
+{
+    std::cout << "  Testing lookup of Sony INZONE H9 (0x0e53)..." << std::endl;
+
+    auto& registry = DeviceRegistry::instance();
+    registry.initialize();
+
+    auto* device = registry.getDevice(0x054c, 0x0e53);
+    ASSERT_NOT_NULL(device, "Sony INZONE H9 should be found");
+    ASSERT_EQ("Sony INZONE H9", std::string(device->getDeviceName()), "Device name should match");
+    ASSERT_TRUE(device->usesSerialPort(), "H9 should use the USB serial port");
+    ASSERT_TRUE((device->getSupportedPlatforms() & PLATFORM_LINUX) != 0, "H9 should support Linux");
+    ASSERT_TRUE((device->getSupportedPlatforms() & PLATFORM_WINDOWS) != 0, "H9 should support Windows");
+    ASSERT_TRUE((device->getCapabilities() & B(CAP_BATTERY_STATUS)) != 0, "H9 should expose battery capability");
+    ASSERT_TRUE((device->getCapabilities() & B(CAP_CHATMIX_STATUS)) != 0, "H9 should expose chatmix capability");
+    ASSERT_TRUE((device->getCapabilities() & B(CAP_SIDETONE)) != 0, "H9 should expose sidetone capability");
+    ASSERT_TRUE((device->getCapabilities() & B(CAP_LIGHTS)) != 0, "H9 should expose lights capability");
+    ASSERT_TRUE((device->getCapabilities() & B(CAP_INACTIVE_TIME)) != 0, "H9 should expose inactive time capability");
+    ASSERT_TRUE((device->getCapabilities() & B(CAP_BT_WHEN_POWERED_ON)) != 0, "H9 should expose Bluetooth power-on capability");
+    ASSERT_TRUE((device->getCapabilities() & B(CAP_ANC)) != 0, "H9 should expose ANC capability");
+    ASSERT_TRUE((device->getCapabilities() & B(CAP_ANC_STARTUP_MODE)) != 0, "H9 should expose ANC startup mode capability");
+    ASSERT_TRUE((device->getCapabilities() & B(CAP_ANC_BUTTON_MODES)) != 0, "H9 should expose ANC button modes capability");
+    ASSERT_TRUE((device->getCapabilities() & B(CAP_MICROPHONE_MUTE_STATUS)) != 0, "H9 should expose microphone mute status capability");
+
+    std::cout << "    OK lookup Sony INZONE H9" << std::endl;
+}
+
 void testLookupSonyINZONEH9II()
 {
     std::cout << "  Testing lookup of Sony INZONE H9 II (0x0fa8)..." << std::endl;
@@ -708,6 +735,7 @@ void runAllDeviceRegistryTests()
     std::cout << "\n=== Device Lookup Tests ===" << std::endl;
     runTest("Lookup Test Device", testLookupTestDevice);
     runTest("Lookup Logitech PRO X2 LIGHTSPEED", testLookupLogitechProX2Lightspeed);
+    runTest("Lookup Sony INZONE H9", testLookupSonyINZONEH9);
     runTest("Lookup Sony INZONE H9 II", testLookupSonyINZONEH9II);
     runTest("Sony INZONE Interface Selection", testSonyINZONEInterfaceSelection);
     runTest("Lookup Plantronics BT600", testLookupPlantronicsBT600);
